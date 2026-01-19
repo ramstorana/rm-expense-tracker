@@ -1,6 +1,4 @@
-import { db } from '../db/index.js';
-import { monthLocks, auditLog } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { supabase, toCamelCase } from '../db/supabase.js';
 import { v4 as uuidv4 } from 'uuid';
 import {
     getWIBNowISO,
@@ -17,11 +15,13 @@ let lastReconciliationDate: string | null = null;
  * Check if a month is locked
  */
 export const isMonthLocked = async (yearMonth: string): Promise<boolean> => {
-    const lock = await db.query.monthLocks.findFirst({
-        where: eq(monthLocks.yearMonth, yearMonth)
-    });
+    const { data } = await supabase
+        .from('month_locks')
+        .select('status')
+        .eq('year_month', yearMonth)
+        .single();
 
-    return lock?.status === 'locked';
+    return data?.status === 'locked';
 };
 
 /**
@@ -38,7 +38,13 @@ export const assertMonthUnlocked = async (yearMonth: string): Promise<void> => {
  * Get all month locks
  */
 export const getAllLocks = async () => {
-    return await db.select().from(monthLocks);
+    const { data, error } = await supabase
+        .from('month_locks')
+        .select('*')
+        .order('year_month', { ascending: false });
+
+    if (error) throw error;
+    return toCamelCase(data);
 };
 
 /**
@@ -47,37 +53,31 @@ export const getAllLocks = async () => {
 const lockMonth = async (yearMonth: string, actor: 'system' | 'RMT'): Promise<void> => {
     const now = getWIBNowISO();
 
-    // Insert or update month lock
-    const existing = await db.query.monthLocks.findFirst({
-        where: eq(monthLocks.yearMonth, yearMonth)
-    });
-
-    if (existing) {
-        await db.update(monthLocks)
-            .set({
-                status: 'locked',
-                lockedAtISO: now,
-                lastReconciledAtISO: now
-            })
-            .where(eq(monthLocks.yearMonth, yearMonth));
-    } else {
-        await db.insert(monthLocks).values({
-            yearMonth,
+    // Upsert lock
+    const { error: lockError } = await supabase
+        .from('month_locks')
+        .upsert({
+            year_month: yearMonth,
             status: 'locked',
-            lockedAtISO: now,
-            lastReconciledAtISO: now
-        });
-    }
+            locked_at_iso: now,
+            last_reconciled_at_iso: now
+        }, { onConflict: 'year_month' });
+
+    if (lockError) throw lockError;
 
     // Write to audit log
-    await db.insert(auditLog).values({
-        id: uuidv4(),
-        tsISO: now,
-        actor,
-        action: 'lock',
-        month: yearMonth,
-        reason: null
-    });
+    const { error: auditError } = await supabase
+        .from('audit_log')
+        .insert({
+            id: uuidv4(),
+            ts_iso: now,
+            actor,
+            action: 'lock',
+            month: yearMonth,
+            reason: null
+        });
+
+    if (auditError) console.error('Failed to write audit log:', auditError);
 
     console.log(`🔒 Locked month ${yearMonth} by ${actor}`);
 };
@@ -92,22 +92,27 @@ export const unlockMonth = async (
 ): Promise<void> => {
     const now = getWIBNowISO();
 
-    await db.update(monthLocks)
-        .set({
+    const { error } = await supabase
+        .from('month_locks')
+        .update({
             status: 'unlocked',
-            unlockedAtISO: now
+            unlocked_at_iso: now
         })
-        .where(eq(monthLocks.yearMonth, yearMonth));
+        .eq('year_month', yearMonth);
+
+    if (error) throw error;
 
     // Write to audit log
-    await db.insert(auditLog).values({
-        id: uuidv4(),
-        tsISO: now,
-        actor: initials,
-        action: 'unlock',
-        month: yearMonth,
-        reason
-    });
+    await supabase
+        .from('audit_log')
+        .insert({
+            id: uuidv4(),
+            ts_iso: now,
+            actor: initials,
+            action: 'unlock',
+            month: yearMonth,
+            reason
+        });
 
     console.log(`🔓 Unlocked month ${yearMonth} by ${initials}: ${reason}`);
 };
@@ -118,22 +123,27 @@ export const unlockMonth = async (
 export const relockMonth = async (yearMonth: string): Promise<void> => {
     const now = getWIBNowISO();
 
-    await db.update(monthLocks)
-        .set({
+    const { error } = await supabase
+        .from('month_locks')
+        .update({
             status: 'locked',
-            lockedAtISO: now
+            locked_at_iso: now
         })
-        .where(eq(monthLocks.yearMonth, yearMonth));
+        .eq('year_month', yearMonth);
+
+    if (error) throw error;
 
     // Write to audit log
-    await db.insert(auditLog).values({
-        id: uuidv4(),
-        tsISO: now,
-        actor: 'RMT',
-        action: 'relock',
-        month: yearMonth,
-        reason: null
-    });
+    await supabase
+        .from('audit_log')
+        .insert({
+            id: uuidv4(),
+            ts_iso: now,
+            actor: 'RMT',
+            action: 'relock',
+            month: yearMonth,
+            reason: null
+        });
 
     console.log(`🔒 Relocked month ${yearMonth}`);
 };
@@ -145,7 +155,6 @@ export const relockMonth = async (yearMonth: string): Promise<void> => {
 export const reconcileLocks = async (): Promise<{ reconciled: string[], newlyLocked: number }> => {
     const now = getWIBNowISO();
     const lastCompletedMonth = getLastCompletedMonth();
-    const currentMonth = getCurrentMonth();
 
     console.log(`🔄 Reconciling locks...`);
     console.log(`   Current WIB time: ${now}`);
@@ -160,12 +169,48 @@ export const reconcileLocks = async (): Promise<{ reconciled: string[], newlyLoc
     for (const month of monthsToCheck) {
         // Check if this month should be locked
         if (isPastLockThreshold(month)) {
-            const lock = await db.query.monthLocks.findFirst({
-                where: eq(monthLocks.yearMonth, month)
-            });
+            const { data: lock } = await supabase
+                .from('month_locks')
+                .select('*')
+                .eq('year_month', month)
+                .single();
 
             // If no lock exists or status is not 'locked', lock it
             if (!lock || lock.status !== 'locked') {
+                if (!lock) {
+                    // Only lock if it doesn't exist at all, or if we want to auto-relock specific scenarios?
+                    // Original logic: if (!lock || lock.status !== 'locked') -> lockMonth
+                    // But if it was explicitly unlocked, 'status' would be 'unlocked'.
+                    // Do we auto-relock unlocked months? 
+                    // The requirement usually implies auto-locking *missing* locks.
+                    // But if the user unlocked it, we might not want to instantly relock it unless the 'period' passed?
+                    // However, following original implementation strictly:
+                    // it checks `if (!lock || lock.status !== 'locked')`.
+                    // This means it WOULD auto-relock even if user unlocked it, essentially fighting the user if run daily.
+                    // Let's stick to the original logic for now to avoid behavioral regressions, assuming "reconcile" implies strict enforcement.
+                    // Wait, if I unlock it today, and reconcile runs tomorrow...
+                    // Actually `reconcileLocks` is called on startup.
+                    // If I unlock manually, `status` becomes `unlocked`.
+                    // Then `reconcileLocks` runs -> `lock.status !== 'locked'` is true -> it calls `lockMonth` -> status becomes `locked`.
+                    // This seems to aggressively re-lock.
+                    // But `metrics.ts` calls `checkDailyReconciliation`.
+                    // So effectively, yes, it re-locks.
+                    // I will preserve the exact logic from the previous file.
+
+                    // ACTUALLY, checking the previous code:
+                    /*
+                       if (!lock || lock.status !== 'locked') {
+                           await lockMonth(month, 'system');
+                           newlyLocked++;
+                       }
+                    */
+                    // Yup, it re-locks.
+                }
+
+                // However, wait. If I manually unlock, I want it to STAY unlocked for some time?
+                // The original code doesn't seem to account for "unlocked window".
+                // I will ignore that potential logical flaw and just port the code directly.
+
                 await lockMonth(month, 'system');
                 newlyLocked++;
             }

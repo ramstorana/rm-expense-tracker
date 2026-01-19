@@ -1,36 +1,34 @@
 import { useState, useEffect } from 'react';
-import type { Category, ExpenseSource } from '../api/client';
+import type { IncomeSource } from '../api/client';
 import { api } from '../api/client';
 import { getWIBToday, toWIBISO } from '../utils/format';
 import { useToast } from './Toast';
 
-interface TransactionFormProps {
-    categories: Category[];
+interface IncomeFormProps {
     selectedMonth: string;
     onSubmit: () => void;
 }
 
-export default function TransactionForm({ categories, selectedMonth: _selectedMonth, onSubmit }: TransactionFormProps) {
+export default function IncomeForm({ selectedMonth: _selectedMonth, onSubmit }: IncomeFormProps) {
     const [date, setDate] = useState(getWIBToday());
-    const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
     const [sourceId, setSourceId] = useState('');
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [expenseSources, setExpenseSources] = useState<ExpenseSource[]>([]);
+    const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
     const { showToast } = useToast();
 
     useEffect(() => {
         const loadSources = async () => {
             try {
-                const sources = await api.getExpenseSources();
-                setExpenseSources(sources);
+                const sources = await api.getIncomeSources();
+                setIncomeSources(sources);
                 if (sources.length > 0) {
                     setSourceId(sources[0].id);
                 }
             } catch (err) {
-                console.error('Failed to load expense sources:', err);
+                console.error('Failed to load income sources:', err);
             }
         };
         loadSources();
@@ -39,7 +37,7 @@ export default function TransactionForm({ categories, selectedMonth: _selectedMo
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!categoryId || !description.trim() || !amount) {
+        if (!sourceId || !description.trim() || !amount) {
             setError('Please fill in all fields');
             return;
         }
@@ -54,10 +52,9 @@ export default function TransactionForm({ categories, selectedMonth: _selectedMo
             setLoading(true);
             setError(null);
 
-            await api.createTransaction({
+            await api.createIncome({
                 dateISO: toWIBISO(date),
-                categoryId,
-                sourceId: sourceId || undefined,
+                sourceId,
                 description: description.trim(),
                 amountRp
             });
@@ -65,10 +62,10 @@ export default function TransactionForm({ categories, selectedMonth: _selectedMo
             // Reset form
             setDescription('');
             setAmount('');
-            showToast('success', 'Transaction added successfully!');
+            showToast('success', 'Income added successfully!');
             onSubmit();
         } catch (err: any) {
-            const errorMessage = err.error?.message || 'Failed to create transaction';
+            const errorMessage = err.error?.message || 'Failed to create income entry';
             setError(errorMessage);
             showToast('error', errorMessage);
         } finally {
@@ -91,28 +88,15 @@ export default function TransactionForm({ categories, selectedMonth: _selectedMo
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                     <input
                         type="date"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
-                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
                     />
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                    <select
-                        value={categoryId}
-                        onChange={(e) => setCategoryId(e.target.value)}
-                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
-                    >
-                        {categories.map(cat => (
-                            <option key={cat.id} value={cat.id}>{cat.name}</option>
-                        ))}
-                    </select>
                 </div>
 
                 <div>
@@ -120,10 +104,9 @@ export default function TransactionForm({ categories, selectedMonth: _selectedMo
                     <select
                         value={sourceId}
                         onChange={(e) => setSourceId(e.target.value)}
-                        className="w-full px-4 py-2 rounded-lg border border-gray-200 bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
                     >
-                        <option value="">-- Select Source --</option>
-                        {expenseSources.map(src => (
+                        {incomeSources.map(src => (
                             <option key={src.id} value={src.id}>{src.name}</option>
                         ))}
                     </select>
@@ -135,8 +118,8 @@ export default function TransactionForm({ categories, selectedMonth: _selectedMo
                         type="text"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="e.g., Lunch at restaurant"
-                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                        placeholder="e.g., January salary"
+                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
                     />
                 </div>
 
@@ -149,7 +132,7 @@ export default function TransactionForm({ categories, selectedMonth: _selectedMo
                             value={amount}
                             onChange={(e) => setAmount(formatAmountInput(e.target.value))}
                             placeholder="0"
-                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
+                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
                         />
                     </div>
                 </div>
@@ -159,12 +142,11 @@ export default function TransactionForm({ categories, selectedMonth: _selectedMo
                 <button
                     type="submit"
                     disabled={loading}
-                    className="px-6 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg font-medium shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-medium shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                    {loading ? 'Adding...' : 'Add Transaction'}
+                    {loading ? 'Adding...' : 'Add Income'}
                 </button>
             </div>
         </form>
     );
 }
-

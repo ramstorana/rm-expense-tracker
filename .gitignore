@@ -5,3 +5,7 @@ dist
 build
 coverage
 .vscode
+.env.local
+*.db
+*.db-shm
+*.db-wal

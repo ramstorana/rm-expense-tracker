@@ -6,12 +6,16 @@ import transactionsRouter from './routes/transactions.js';
 import categoriesRouter from './routes/categories.js';
 import metricsRouter from './routes/metrics.js';
 import locksRouter from './routes/locks.js';
+import expenseSourcesRouter from './routes/expenseSources.js';
+import incomeSourcesRouter from './routes/incomeSources.js';
+import incomeRouter from './routes/income.js';
 
 // Import services
 import { reconcileLocks, checkDailyReconciliation } from './services/lockService.js';
 
 // Import database to ensure tables are created
-import './db/migrate.js';
+// Import database to ensure tables are created (using Supabase now, so no local migration needed on start)
+// import './db/migrate.js';
 
 const app = express();
 const PORT = process.env.PORT || 5180;
@@ -38,6 +42,9 @@ app.use('/api/transactions', transactionsRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/metrics', metricsRouter);
 app.use('/api/locks', locksRouter);
+app.use('/api/expense-sources', expenseSourcesRouter);
+app.use('/api/income-sources', incomeSourcesRouter);
+app.use('/api/income', incomeRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -48,7 +55,7 @@ app.get('/api/health', (req, res) => {
 const startServer = async () => {
     try {
         // Run initial lock reconciliation on startup
-        console.log('🚀 Starting WIB Expense Tracker Backend...');
+        console.log('🚀 Starting RM Financial Tracker Backend...');
         await reconcileLocks();
 
         app.listen(PORT, () => {

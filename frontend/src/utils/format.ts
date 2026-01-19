@@ -46,6 +46,7 @@ export const formatPercent = (value: number | null): string => {
  * Format month for display (e.g., "Jan 2026")
  */
 export const formatMonth = (yearMonth: string): string => {
+    if (!yearMonth) return '—';
     return dayjs(`${yearMonth}-01`).tz(WIB_TIMEZONE).format('MMM YYYY');
 };
 

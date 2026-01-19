@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sortable Transactions Table</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --red-600: #dc2626;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, var(--gray-50), #e0e7ff, var(--gray-100));
+            min-height: 100vh;
+            padding: 2rem;
+            color: var(--gray-800);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--gray-500);
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .controls {
+            margin-bottom: 1rem;
+        }
+
+        .reset-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--gray-100);
+            border: 1px solid var(--gray-200);
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--gray-600);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .reset-btn:hover {
+            background: var(--gray-200);
+            color: var(--gray-800);
+        }
+
+        .reset-btn:focus {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        .table-wrapper {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--gray-50);
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        th {
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--gray-500);
+        }
+
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+
+        th.sortable:hover {
+            background: var(--gray-100);
+        }
+
+        th.sortable:focus {
+            outline: 2px solid var(--primary);
+            outline-offset: -2px;
+        }
+
+        .th-content {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .sort-icons {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .sort-icon {
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+        }
+
+        .sort-icon.up {
+            border-bottom: 5px solid var(--gray-300);
+        }
+
+        .sort-icon.down {
+            border-top: 5px solid var(--gray-300);
+        }
+
+        .sort-icon.active {
+            border-bottom-color: var(--primary);
+            border-top-color: var(--primary);
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            font-size: 0.875rem;
+            color: var(--gray-700);
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: var(--gray-50);
+        }
+
+        .date-cell {
+            white-space: nowrap;
+            color: var(--gray-500);
+            font-size: 0.8125rem;
+        }
+
+        .category-cell {
+            display: inline-flex;
+            padding: 0.25rem 0.625rem;
+            background: var(--gray-100);
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--gray-600);
+        }
+
+        .source-cell {
+            color: var(--gray-400);
+        }
+
+        .amount-cell {
+            font-weight: 600;
+            color: var(--red-600);
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 1rem;
+            }
+
+            th,
+            td {
+                padding: 0.75rem 0.5rem;
+                font-size: 0.75rem;
+            }
+
+            .amount-cell {
+                font-size: 0.75rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Transactions</h1>
+        <p class="subtitle">Click column headers to sort • January 2026</p>
+
+        <div class="controls">
+            <button class="reset-btn" id="resetBtn" type="button">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                </svg>
+                Reset Order
+            </button>
+        </div>
+
+        <div class="table-wrapper">
+            <table role="grid" aria-label="Transactions table">
+                <thead>
+                    <tr>
+                        <th class="sortable" data-column="date" tabindex="0" role="columnheader" aria-sort="none">
+                            <div class="th-content">
+                                Date
+                                <div class="sort-icons">
+                                    <span class="sort-icon up"></span>
+                                    <span class="sort-icon down"></span>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="sortable" data-column="category" tabindex="0" role="columnheader" aria-sort="none">
+                            <div class="th-content">
+                                Category
+                                <div class="sort-icons">
+                                    <span class="sort-icon up"></span>
+                                    <span class="sort-icon down"></span>
+                                </div>
+                            </div>
+                        </th>
+                        <th>Source</th>
+                        <th class="sortable" data-column="description" tabindex="0" role="columnheader"
+                            aria-sort="none">
+                            <div class="th-content">
+                                Description
+                                <div class="sort-icons">
+                                    <span class="sort-icon up"></span>
+                                    <span class="sort-icon down"></span>
+                                </div>
+                            </div>
+                        </th>
+                        <th class="sortable" data-column="amount" tabindex="0" role="columnheader" aria-sort="none"
+                            style="text-align: right;">
+                            <div class="th-content" style="justify-content: flex-end;">
+                                Amount
+                                <div class="sort-icons">
+                                    <span class="sort-icon up"></span>
+                                    <span class="sort-icon down"></span>
+                                </div>
+                            </div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <!-- Rows rendered by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // ORIGINAL DATA (immutable)
+        // ==========================================
+        const ORIGINAL_DATA = Object.freeze([
+            { date: '18 Jan 2026', category: 'Food', source: '-', description: 'KFC', amount: 'Rp 77.000' },
+            { date: '18 Jan 2026', category: 'Shopping', source: '-', description: 'RAKET MARE', amount: 'Rp 2.450.000' },
+            { date: '18 Jan 2026', category: 'Food', source: '-', description: 'GOJEK', amount: 'Rp 50.000' },
+            { date: '18 Jan 2026', category: 'Health', source: '-', description: 'PHYSIOTHERAPY', amount: 'Rp 300.000' },
+            { date: '17 Jan 2026', category: 'Housing', source: '-', description: 'SUSU ALFATIH', amount: 'Rp 472.336' },
+            { date: '16 Jan 2026', category: 'Transport', source: '-', description: 'GRAB', amount: 'Rp 45.000' },
+            { date: '16 Jan 2026', category: 'Food', source: '-', description: 'MCDONALD', amount: 'Rp 89.000' },
+            { date: '15 Jan 2026', category: 'Entertainment', source: '-', description: 'NETFLIX', amount: 'Rp 150.000' },
+            { date: '14 Jan 2026', category: 'Utilities', source: '-', description: 'PLN ELECTRIC', amount: 'Rp 850.000' },
+            { date: '13 Jan 2026', category: 'Education', source: '-', description: 'UDEMY COURSE', amount: 'Rp 199.000' },
+        ]);
+
+        // ==========================================
+        // STATE
+        // ==========================================
+        let currentData = [...ORIGINAL_DATA];
+        let sortState = { column: null, direction: null };
+
+        // ==========================================
+        // PURE FUNCTIONS
+        // ==========================================
+
+        /**
+         * Parse date string "DD MMM YYYY" to Date object
+         * @param {string} str - Date string like "18 Jan 2026"
+         * @returns {Date}
+         */
+        function parseDate(str) {
+            const months = {
+                'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+                'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+            };
+            const parts = str.trim().split(/\s+/);
+            const day = parseInt(parts[0], 10);
+            const month = months[parts[1].toLowerCase().substring(0, 3)] || 0;
+            const year = parseInt(parts[2], 10) || 2026;
+            return new Date(year, month, day);
+        }
+
+        /**
+         * Parse Indonesian Rupiah string to number
+         * @param {string} str - Amount like "Rp 2.450.000"
+         * @returns {number}
+         */
+        function parseRupiah(str) {
+            // Remove "Rp", spaces, and thousand separators (dots)
+            const cleaned = str.replace(/Rp\s*/i, '').replace(/\./g, '').replace(/,/g, '.');
+            return parseFloat(cleaned) || 0;
+        }
+
+        /**
+         * Sort data by column and direction (stable sort)
+         * @param {Array} data - Array of transaction objects
+         * @param {string} column - Column to sort by
+         * @param {string} direction - 'asc' or 'desc'
+         * @returns {Array} - New sorted array
+         */
+        function sortBy(data, column, direction) {
+            // Create indexed copy for stable sort
+            const indexed = data.map((item, index) => ({ item, index }));
+
+            indexed.sort((a, b) => {
+                let valA, valB;
+
+                switch (column) {
+                    case 'date':
+                        valA = parseDate(a.item.date).getDate();
+                        valB = parseDate(b.item.date).getDate();
+                        break;
+                    case 'category':
+                        valA = a.item.category.toLowerCase();
+                        valB = b.item.category.toLowerCase();
+                        break;
+                    case 'description':
+                        valA = a.item.description.toLowerCase();
+                        valB = b.item.description.toLowerCase();
+                        break;
+                    case 'amount':
+                        valA = parseRupiah(a.item.amount);
+                        valB = parseRupiah(b.item.amount);
+                        break;
+                    default:
+                        return 0;
+                }
+
+                let comparison = 0;
+                if (typeof valA === 'string') {
+                    comparison = valA.localeCompare(valB);
+                } else {
+                    comparison = valA - valB;
+                }
+
+                // Stable sort: preserve original order for ties
+                if (comparison === 0) {
+                    return a.index - b.index;
+                }
+
+                return direction === 'desc' ? -comparison : comparison;
+            });
+
+            return indexed.map(i => i.item);
+        }
+
+        /**
+         * Render table rows from data
+         * @param {Array} data - Array of transaction objects
+         */
+        function renderRows(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="date-cell">${escapeHtml(row.date)}</td>
+                    <td><span class="category-cell">${escapeHtml(row.category)}</span></td>
+                    <td class="source-cell">${escapeHtml(row.source)}</td>
+                    <td>${escapeHtml(row.description)}</td>
+                    <td class="amount-cell">${escapeHtml(row.amount)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        /**
+         * Escape HTML to prevent XSS
+         * @param {string} str
+         * @returns {string}
+         */
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // ==========================================
+        // UI UPDATES
+        // ==========================================
+
+        function updateSortIndicators() {
+            const headers = document.querySelectorAll('th.sortable');
+
+            headers.forEach(th => {
+                const column = th.dataset.column;
+                const upIcon = th.querySelector('.sort-icon.up');
+                const downIcon = th.querySelector('.sort-icon.down');
+
+                // Reset all
+                upIcon.classList.remove('active');
+                downIcon.classList.remove('active');
+                th.setAttribute('aria-sort', 'none');
+
+                // Set active
+                if (sortState.column === column) {
+                    if (sortState.direction === 'asc') {
+                        upIcon.classList.add('active');
+                        th.setAttribute('aria-sort', 'ascending');
+                    } else {
+                        downIcon.classList.add('active');
+                        th.setAttribute('aria-sort', 'descending');
+                    }
+                }
+            });
+        }
+
+        function handleSort(column) {
+            // Toggle direction
+            if (sortState.column === column) {
+                sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState.column = column;
+                // Default direction based on column type
+                if (column === 'amount') {
+                    sortState.direction = 'desc'; // Largest first
+                } else if (column === 'date') {
+                    sortState.direction = 'asc'; // Day 1 to 31
+                } else {
+                    sortState.direction = 'asc'; // A-Z
+                }
+            }
+
+            currentData = sortBy([...ORIGINAL_DATA], sortState.column, sortState.direction);
+            renderRows(currentData);
+            updateSortIndicators();
+        }
+
+        function resetSort() {
+            sortState = { column: null, direction: null };
+            currentData = [...ORIGINAL_DATA];
+            renderRows(currentData);
+            updateSortIndicators();
+        }
+
+        // ==========================================
+        // EVENT LISTENERS
+        // ==========================================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initial render
+            renderRows(currentData);
+
+            // Sortable headers
+            const headers = document.querySelectorAll('th.sortable');
+            headers.forEach(th => {
+                th.addEventListener('click', () => handleSort(th.dataset.column));
+                th.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleSort(th.dataset.column);
+                    }
+                });
+            });
+
+            // Reset button
+            document.getElementById('resetBtn').addEventListener('click', resetSort);
+        });
+    </script>
+</body>
+
+</html>

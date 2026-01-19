@@ -1,7 +1,5 @@
 import { Router } from 'express';
-import { db } from '../db/index.js';
-import { categories } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { supabase, toCamelCase, toSnakeCase } from '../db/supabase.js';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -20,8 +18,14 @@ const updateCategorySchema = z.object({
 // GET /categories - List all categories
 router.get('/', async (req, res) => {
     try {
-        const allCategories = await db.select().from(categories);
-        res.json(allCategories);
+        const { data, error } = await supabase
+            .from('categories')
+            .select('*')
+            .order('name');
+
+        if (error) throw error;
+
+        res.json(toCamelCase(data));
     } catch (error: any) {
         res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     }
@@ -38,16 +42,24 @@ router.post('/', async (req, res) => {
             archived: false
         };
 
-        await db.insert(categories).values(newCategory);
+        const { data: inserted, error } = await supabase
+            .from('categories')
+            .insert(newCategory)
+            .select()
+            .single();
 
-        res.status(201).json(newCategory);
+        if (error) {
+            // Check for unique constraint violation
+            if (error.code === '23505') { // Postgres unique violation code
+                return res.status(409).json({ error: { code: 'DUPLICATE', message: 'Category name already exists' } });
+            }
+            throw error;
+        }
+
+        res.status(201).json(toCamelCase(inserted));
     } catch (error: any) {
         if (error instanceof z.ZodError) {
             return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: error.errors } });
-        }
-        // Check for unique constraint violation
-        if (error.message?.includes('UNIQUE')) {
-            return res.status(409).json({ error: { code: 'DUPLICATE', message: 'Category name already exists' } });
         }
         res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     }
@@ -59,32 +71,29 @@ router.patch('/:id', async (req, res) => {
         const { id } = req.params;
         const data = updateCategorySchema.parse(req.body);
 
-        // Get existing category
-        const existing = await db.query.categories.findFirst({
-            where: eq(categories.id, id)
-        });
+        // Update directly
+        const { data: updated, error } = await supabase
+            .from('categories')
+            .update(toSnakeCase(data))
+            .eq('id', id)
+            .select()
+            .single();
 
-        if (!existing) {
+        if (error) {
+            if (error.code === '23505') {
+                return res.status(409).json({ error: { code: 'DUPLICATE', message: 'Category name already exists' } });
+            }
+            throw error;
+        }
+
+        if (!updated) {
             return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Category not found' } });
         }
 
-        const updates: any = {};
-        if (data.name !== undefined) updates.name = data.name;
-        if (data.archived !== undefined) updates.archived = data.archived;
-
-        await db.update(categories).set(updates).where(eq(categories.id, id));
-
-        const updated = await db.query.categories.findFirst({
-            where: eq(categories.id, id)
-        });
-
-        res.json(updated);
+        res.json(toCamelCase(updated));
     } catch (error: any) {
         if (error instanceof z.ZodError) {
             return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: error.errors } });
-        }
-        if (error.message?.includes('UNIQUE')) {
-            return res.status(409).json({ error: { code: 'DUPLICATE', message: 'Category name already exists' } });
         }
         res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: error.message } });
     }

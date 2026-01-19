@@ -8,39 +8,32 @@ import { assertMonthUnlocked } from '../services/lockService.js';
 const router = Router();
 
 // Validation schemas
-const createTransactionSchema = z.object({
+const createIncomeSchema = z.object({
     dateISO: z.string(),
-    categoryId: z.string().uuid(),
+    sourceId: z.string().uuid(),
     description: z.string().min(1),
-    amountRp: z.number().int().min(0),
-    sourceId: z.string().uuid().optional().nullable()
+    amountRp: z.number().int().min(0)
 });
 
-const updateTransactionSchema = z.object({
+const updateIncomeSchema = z.object({
     dateISO: z.string().optional(),
-    categoryId: z.string().uuid().optional(),
+    sourceId: z.string().uuid().optional(),
     description: z.string().min(1).optional(),
-    amountRp: z.number().int().min(0).optional(),
-    sourceId: z.string().uuid().optional().nullable()
+    amountRp: z.number().int().min(0).optional()
 });
 
-// GET /transactions - List transactions with optional filters
+// GET /income - List income entries with optional filters
 router.get('/', async (req, res) => {
     try {
-        const { month, categoryId } = req.query;
+        const { month, sourceId } = req.query;
 
         let query = supabase
-            .from('transactions')
+            .from('income')
             .select('*')
             .order('date_iso', { ascending: false });
 
-        if (month) {
-            query = query.eq('year_month', month);
-        }
-
-        if (categoryId) {
-            query = query.eq('category_id', categoryId);
-        }
+        if (month) query = query.eq('year_month', month);
+        if (sourceId) query = query.eq('source_id', sourceId);
 
         const { data, error } = await query;
 
@@ -52,10 +45,10 @@ router.get('/', async (req, res) => {
     }
 });
 
-// POST /transactions - Create a new transaction
+// POST /income - Create a new income entry
 router.post('/', async (req, res) => {
     try {
-        const data = createTransactionSchema.parse(req.body);
+        const data = createIncomeSchema.parse(req.body);
 
         // Derive year-month in WIB context
         const yearMonth = getYearMonth(data.dateISO);
@@ -64,11 +57,10 @@ router.post('/', async (req, res) => {
         await assertMonthUnlocked(yearMonth);
 
         const now = getWIBNowISO();
-        const newTransaction = {
+        const newIncome = {
             id: uuidv4(),
             dateISO: data.dateISO,
-            yearMonth,
-            categoryId: data.categoryId,
+            yearMonth: yearMonth,
             sourceId: data.sourceId,
             description: data.description,
             amountRp: data.amountRp,
@@ -77,12 +69,12 @@ router.post('/', async (req, res) => {
         };
 
         const { error } = await supabase
-            .from('transactions')
-            .insert(toSnakeCase(newTransaction));
+            .from('income')
+            .insert(toSnakeCase(newIncome));
 
         if (error) throw error;
 
-        res.status(201).json(newTransaction);
+        res.status(201).json(newIncome);
     } catch (error: any) {
         if (error.message?.startsWith('MONTH_LOCKED')) {
             return res.status(403).json({ error: { code: 'MONTH_LOCKED', message: error.message } });
@@ -94,21 +86,21 @@ router.post('/', async (req, res) => {
     }
 });
 
-// PATCH /transactions/:id - Update a transaction
+// PATCH /income/:id - Update an income entry
 router.patch('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const data = updateTransactionSchema.parse(req.body);
+        const data = updateIncomeSchema.parse(req.body);
 
-        // Get existing transaction
+        // Get existing income entry
         const { data: existing, error: fetchError } = await supabase
-            .from('transactions')
+            .from('income')
             .select('*')
             .eq('id', id)
             .single();
 
         if (fetchError || !existing) {
-            return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Transaction not found' } });
+            return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Income entry not found' } });
         }
 
         const existingCamel = toCamelCase(existing);
@@ -129,13 +121,12 @@ router.patch('/:id', async (req, res) => {
             updates.dateISO = data.dateISO;
             updates.yearMonth = getYearMonth(data.dateISO);
         }
-        if (data.categoryId) updates.categoryId = data.categoryId;
-        if (data.sourceId !== undefined) updates.sourceId = data.sourceId;
+        if (data.sourceId) updates.sourceId = data.sourceId;
         if (data.description) updates.description = data.description;
         if (data.amountRp !== undefined) updates.amountRp = data.amountRp;
 
         const { data: updated, error: updateError } = await supabase
-            .from('transactions')
+            .from('income')
             .update(toSnakeCase(updates))
             .eq('id', id)
             .select()
@@ -155,20 +146,20 @@ router.patch('/:id', async (req, res) => {
     }
 });
 
-// DELETE /transactions/:id - Delete a transaction
+// DELETE /income/:id - Delete an income entry
 router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Get existing transaction
+        // Get existing income entry
         const { data: existing, error: fetchError } = await supabase
-            .from('transactions')
+            .from('income')
             .select('*')
             .eq('id', id)
             .single();
 
         if (fetchError || !existing) {
-            return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Transaction not found' } });
+            return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Income entry not found' } });
         }
 
         const existingCamel = toCamelCase(existing);
@@ -177,7 +168,7 @@ router.delete('/:id', async (req, res) => {
         await assertMonthUnlocked(existingCamel.yearMonth);
 
         const { error: deleteError } = await supabase
-            .from('transactions')
+            .from('income')
             .delete()
             .eq('id', id);
 

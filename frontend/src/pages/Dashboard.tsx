@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { api, type Transaction, type Category, type MetricsSummary, type TrendDataPoint, type CategoryBreakdown, type MonthLock } from '../api/client';
+import { api, type Transaction, type Category, type ExpenseSource, type MetricsSummary, type TrendDataPoint, type CategoryBreakdown, type MonthLock } from '../api/client';
 import { getCurrentMonth, formatRupiah, formatPercent, formatMonth, getWIBToday } from '../utils/format';
 import dayjs from 'dayjs';
 import TransactionForm from '../components/TransactionForm';
@@ -7,19 +7,24 @@ import TransactionsTable from '../components/TransactionsTable';
 import MetricTile from '../components/MetricTile';
 import TrendChart from '../components/TrendChart';
 import CategoryBreakdownChart from '../components/CategoryBreakdownChart';
+import CategoryTrendChart from '../components/CategoryTrendChart';
 import LockManager from '../components/LockManager';
+import ExportPDFButton from '../components/ExportPDFButton';
+import { useToast } from '../components/Toast';
 
 export default function Dashboard() {
     const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
     const [trendRange, setTrendRange] = useState<'1W' | '1M' | '3M' | '6M' | 'YTD'>('1W');
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [expenseSources, setExpenseSources] = useState<ExpenseSource[]>([]);
     const [summary, setSummary] = useState<MetricsSummary | null>(null);
     const [trend, setTrend] = useState<TrendDataPoint[]>([]);
     const [breakdown, setBreakdown] = useState<CategoryBreakdown[]>([]);
     const [locks, setLocks] = useState<MonthLock[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const { showToast } = useToast();
 
     // Check if selected month is locked
     const isMonthLocked = locks.find(l => l.yearMonth === selectedMonth)?.status === 'locked';
@@ -29,26 +34,36 @@ export default function Dashboard() {
             setLoading(true);
             setError(null);
 
-            const [txns, cats, sum, brk, lks] = await Promise.all([
+            const [txns, cats, srcs, sum, brk, lks] = await Promise.all([
                 api.getTransactions(selectedMonth),
                 api.getCategories(),
+                api.getExpenseSources(),
                 api.getSummary(selectedMonth),
                 api.getBreakdown(selectedMonth),
                 api.getLocks()
             ]);
 
             setTransactions(txns);
-            setCategories(cats);
+            setCategories(cats.sort((a, b) => {
+                const isOtherA = a.name === 'Other' || a.name === 'Others';
+                const isOtherB = b.name === 'Other' || b.name === 'Others';
+                if (isOtherA && !isOtherB) return 1;
+                if (!isOtherA && isOtherB) return -1;
+                return 0;
+            }));
+            setExpenseSources(srcs);
             setSummary(sum);
             setBreakdown(brk);
             setLocks(lks);
         } catch (err: any) {
-            setError(err.error?.message || 'Failed to load data');
+            const errorMessage = err.error?.message || 'Failed to load data';
+            setError(errorMessage);
+            showToast('error', errorMessage);
             console.error(err);
         } finally {
             setLoading(false);
         }
-    }, [selectedMonth]);
+    }, [selectedMonth, showToast]);
 
     useEffect(() => {
         loadData();
@@ -145,9 +160,9 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">
-                                RM Expense Tracker
+                                RM Financial Tracker
                             </h1>
-                            <p className="text-sm text-gray-500 mt-1">Track your expenses in IDR • All times in WIB</p>
+                            <p className="text-sm text-gray-500 mt-1">Track your monthly finance in IDR • All times in WIB</p>
                         </div>
 
                         <div className="flex items-center gap-4">
@@ -166,6 +181,8 @@ export default function Dashboard() {
                                 isLocked={isMonthLocked}
                                 onLockChange={handleLockChange}
                             />
+
+                            <ExportPDFButton selectedMonth={selectedMonth} />
                         </div>
                     </div>
                 </div>
@@ -244,10 +261,16 @@ export default function Dashboard() {
                     </div>
                 </section>
 
+                {/* Category Trend Section */}
+                <section className="glass-card rounded-2xl p-6 shadow-lg mb-8 animate-fade-in">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-4">Category Spending Trends</h2>
+                    <CategoryTrendChart categories={categories} />
+                </section>
+
                 {/* Transaction Entry Form */}
                 {!isMonthLocked && (
                     <section className="glass-card rounded-2xl p-6 shadow-lg mb-8 animate-fade-in">
-                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Add Expense</h2>
+                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Add Transaction</h2>
                         <TransactionForm
                             categories={categories.filter(c => !c.archived)}
                             selectedMonth={selectedMonth}
@@ -274,6 +297,7 @@ export default function Dashboard() {
                     <TransactionsTable
                         transactions={transactions}
                         categories={categories}
+                        expenseSources={expenseSources}
                         isLocked={isMonthLocked}
                         onUpdate={handleTransactionUpdated}
                         onDelete={handleTransactionDeleted}

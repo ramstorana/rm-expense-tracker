@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api/client';
 import { formatMonth } from '../utils/format';
+import { useToast } from './Toast';
 
 interface LockManagerProps {
     month: string;
@@ -13,6 +14,7 @@ export default function LockManager({ month, isLocked, onLockChange }: LockManag
     const [reason, setReason] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { showToast } = useToast();
 
     const handleUnlock = async () => {
         if (!reason.trim()) {
@@ -26,9 +28,12 @@ export default function LockManager({ month, isLocked, onLockChange }: LockManag
             await api.unlockMonth(month, reason.trim(), 'RMT');
             setShowModal(false);
             setReason('');
+            showToast('success', `${formatMonth(month)} unlocked successfully!`);
             onLockChange();
         } catch (err: any) {
-            setError(err.error?.message || 'Failed to unlock');
+            const errorMessage = err.error?.message || 'Failed to unlock';
+            setError(errorMessage);
+            showToast('error', errorMessage);
         } finally {
             setLoading(false);
         }
@@ -37,10 +42,14 @@ export default function LockManager({ month, isLocked, onLockChange }: LockManag
     const handleRelock = async () => {
         try {
             setLoading(true);
+            setError(null);
             await api.relockMonth(month);
+            showToast('success', `${formatMonth(month)} locked successfully!`);
             onLockChange();
         } catch (err: any) {
-            setError(err.error?.message || 'Failed to relock');
+            const errorMessage = err.error?.message || 'Failed to relock';
+            setError(errorMessage);
+            showToast('error', errorMessage);
         } finally {
             setLoading(false);
         }

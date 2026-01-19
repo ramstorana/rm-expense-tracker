@@ -28,29 +28,37 @@ interface TrendChartProps {
     data: TrendDataPoint[];
     currentMonth: string;
     granularity?: 'monthly' | 'daily';
+    type?: 'expense' | 'income';
 }
 
-export default function TrendChart({ data, currentMonth, granularity = 'monthly' }: TrendChartProps) {
+export default function TrendChart({ data, currentMonth, granularity = 'monthly', type = 'expense' }: TrendChartProps) {
     if (data.length === 0) {
         return (
             <div className="h-64 flex items-center justify-center text-gray-400">
-                No trend data available
+                No {type} data available
             </div>
         );
     }
+
+    const isIncome = type === 'income';
+    const primaryColor = isIncome ? '#10b981' : '#0ea5e9'; // emerald-500 vs primary-500
+    const pointColor = isIncome ? '#10b981' : '#8b5cf6'; // emerald-500 vs accent-500
+    const bgColor = isIncome ? 'rgba(16, 185, 129, 0.1)' : 'rgba(14, 165, 233, 0.1)';
 
     const chartData = {
         labels: data.map(d => granularity === 'daily' ? formatDate(d.month) : formatMonth(d.month)),
         datasets: [
             {
-                label: granularity === 'daily' ? 'Daily Expenses' : 'Monthly Expenses',
+                label: granularity === 'daily'
+                    ? `Daily ${type === 'income' ? 'Income' : 'Expenses'}`
+                    : `Monthly ${type === 'income' ? 'Income' : 'Expenses'}`,
                 data: data.map(d => d.total),
-                borderColor: '#0ea5e9',
-                backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                borderColor: primaryColor,
+                backgroundColor: bgColor,
                 fill: true,
                 tension: 0.4,
                 pointRadius: data.map(d => (granularity === 'monthly' && d.month === currentMonth) ? 6 : 3),
-                pointBackgroundColor: data.map(d => (granularity === 'monthly' && d.month === currentMonth) ? '#8b5cf6' : '#0ea5e9'),
+                pointBackgroundColor: data.map(d => (granularity === 'monthly' && d.month === currentMonth) ? pointColor : primaryColor),
                 pointBorderColor: '#fff',
                 pointBorderWidth: 2,
             }

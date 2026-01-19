@@ -1,7 +1,7 @@
-# Project Brief — WIB Expense Tracker
+# Project Brief — RM Financial Tracker
 
 ## Purpose
-- Single-user, local-first expense tracker focused purely on expenses.
+- Single-user, local-first finance tracker for tracking income and expenses.
 
 ## Core Features
 - Transaction entry: date (WIB), category, description, amount (IDR).

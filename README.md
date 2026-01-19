@@ -1,6 +1,6 @@
-# WIB Expense Tracker
+# RM Financial Tracker
 
-A single-user expense tracker focused purely on expenses, with WIB (Asia/Jakarta) timezone support.
+A single-user monthly finance tracker focused on income and expenses, with WIB (Asia/Jakarta) timezone support.
 
 ## Features
 
