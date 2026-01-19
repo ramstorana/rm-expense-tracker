@@ -16,6 +16,6 @@
 - [ ] Fix any visual regressions
 
 ## Phase 3: Deployment
-- [ ] Ensure Vercel environment variables are set
-- [ ] Deploy to Vercel
+- [x] Ensure Vercel environment variables are set
+- [x] Deploy to Vercel
 - [ ] Verify functionality on production URL

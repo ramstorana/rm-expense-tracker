@@ -4,14 +4,24 @@
     "outputDirectory": "frontend/dist",
     "rewrites": [
         {
-            "source": "/api/:path*",
-            "destination": "/api"
+            "source": "/api/metrics/:path*",
+            "destination": "/api/metrics"
+        },
+        {
+            "source": "/api/locks/:path*",
+            "destination": "/api/locks"
+        },
+        {
+            "source": "/api/transactions/:path*",
+            "destination": "/api/transactions"
+        },
+        {
+            "source": "/api/income/:path*",
+            "destination": "/api/income"
+        },
+        {
+            "source": "/api/categories/:path*",
+            "destination": "/api/categories"
         }
-    ],
-    "functions": {
-        "api/index.ts": {
-            "memory": 256,
-            "maxDuration": 10
-        }
-    }
+    ]
 }
