@@ -52,5 +52,12 @@ Food, Transport, Housing, Utilities, Health, Entertainment, Shopping, Education,
 
 - **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Chart.js
 - **Backend**: Node.js, Express, TypeScript, Zod
-- **Database**: SQLite with Drizzle ORM
+- **Database**: Supabase (PostgreSQL)
 - **Time**: dayjs with timezone support
+- **Migration**: Fully migrated from SQLite to Supabase
+
+## Vercel Environment Variables
+- `SUPABASE_URL`
+- `SUPABASE_KEY`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
