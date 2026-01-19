@@ -304,13 +304,21 @@ export default function ExportPDFButton({ selectedMonth }: ExportPDFButtonProps)
                 addFooter(i, totalPages);
             }
 
-            // Save PDF
+            // Save PDF using Blob for better browser compatibility
             const filename = `RM-Statement-${selectedMonth}.pdf`;
-            doc.save(filename);
+            const pdfBlob = doc.output('blob');
+            const url = URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to generate PDF:', error);
-            alert('Failed to generate PDF. Please try again.');
+            alert(`Failed to generate PDF: ${error?.message || 'Unknown error'}`);
         } finally {
             setLoading(false);
         }
