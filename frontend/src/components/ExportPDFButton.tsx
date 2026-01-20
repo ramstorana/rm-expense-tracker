@@ -169,7 +169,10 @@ export default function ExportPDFButton({ selectedMonth }: ExportPDFButtonProps)
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...darkColor);
 
-            const sortedTransactions = [...transactions].sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+            const sortedTransactions = [...transactions].sort((a, b) => {
+                if (!a.dateISO || !b.dateISO) return 0;
+                return a.dateISO.localeCompare(b.dateISO);
+            });
 
             sortedTransactions.forEach((txn, i) => {
                 checkNewPage(6);
@@ -225,7 +228,10 @@ export default function ExportPDFButton({ selectedMonth }: ExportPDFButtonProps)
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...darkColor);
 
-            const sortedIncome = [...income].sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+            const sortedIncome = [...income].sort((a, b) => {
+                if (!a.dateISO || !b.dateISO) return 0;
+                return a.dateISO.localeCompare(b.dateISO);
+            });
 
             sortedIncome.forEach((inc, i) => {
                 checkNewPage(6);
