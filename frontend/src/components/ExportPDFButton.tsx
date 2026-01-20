@@ -310,29 +310,29 @@ export default function ExportPDFButton({ selectedMonth }: ExportPDFButtonProps)
                 addFooter(i, totalPages);
             }
 
-            // Save PDF - try native jsPDF save first, fallback to blob
+            // Save PDF with explicit blob method for better cross-browser compatibility
             const filename = `RM-Statement-${selectedMonth}.pdf`;
 
-            try {
-                // jsPDF's native save - works in most browsers
-                doc.save(filename);
-            } catch {
-                // Fallback: Create blob with proper type and use FileSaver-like approach
-                const pdfBlob = new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
-                const url = window.URL.createObjectURL(pdfBlob);
-                const link = document.createElement('a');
-                link.style.display = 'none';
-                link.href = url;
-                link.setAttribute('download', filename);
-                document.body.appendChild(link);
-                link.click();
+            // Use blob method consistently for better filename handling
+            const pdfBlob = doc.output('blob');
 
-                // Cleanup
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-            }
+            // Create download link with explicit filename and type
+            const url = window.URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename; // Use .download property instead of setAttribute
+            link.type = 'application/pdf';
+            link.rel = 'noopener noreferrer';
+
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+
+            // Cleanup
+            setTimeout(() => {
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            }, 100);
 
         } catch (error: any) {
             console.error('Failed to generate PDF:', error);
