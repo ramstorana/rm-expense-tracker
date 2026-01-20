@@ -310,29 +310,9 @@ export default function ExportPDFButton({ selectedMonth }: ExportPDFButtonProps)
                 addFooter(i, totalPages);
             }
 
-            // Save PDF with explicit blob method for better cross-browser compatibility
+            // Use jsPDF's native save method - handles all browser quirks for filename
             const filename = `RM-Statement-${selectedMonth}.pdf`;
-
-            // Use blob method consistently for better filename handling
-            const pdfBlob = doc.output('blob');
-
-            // Create download link with explicit filename and type
-            const url = window.URL.createObjectURL(pdfBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = filename; // Use .download property instead of setAttribute
-            link.type = 'application/pdf';
-            link.rel = 'noopener noreferrer';
-
-            // Trigger download
-            document.body.appendChild(link);
-            link.click();
-
-            // Cleanup
-            setTimeout(() => {
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-            }, 100);
+            doc.save(filename);
 
         } catch (error: any) {
             console.error('Failed to generate PDF:', error);
